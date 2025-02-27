@@ -1,4 +1,4 @@
-﻿#include <iostream>
+#include <iostream>
 #include <thread>
 #include <random>
 #include <Windows.h>
@@ -18,12 +18,14 @@ void modifyArray(LPVOID) {
 
 void squareNegativeNumbers(LPVOID) {
     while (true) {
+        //вход в критическую сессию
         EnterCriticalSection(&cs);
         for (int i = 0; i < ARRAY_SIZE; ++i) {
             if (arr[i] < 0) {
                 arr[i] *= arr[i];
             }
         }
+        //выход
         LeaveCriticalSection(&cs);
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }
@@ -42,6 +44,7 @@ void printArray(LPVOID) {
 }
 
 int main() {
+    // инициализация к.с
     InitializeCriticalSection(&cs);
     modifyArray(nullptr);
 
