@@ -1,4 +1,4 @@
-﻿#include <iostream>
+#include <iostream>
 #include <thread>
 #include <random>
 #include <Windows.h>
@@ -19,6 +19,7 @@ void replacePositiveNumbers(LPVOID) {
     while (true) {
         for (int i = 0; i < SIZE_ARR; ++i) {
             if (arr[i] > 0) {
+                //замена значений
                 InterlockedExchange(&arr[i], 0);
             }
         }
@@ -27,7 +28,7 @@ void replacePositiveNumbers(LPVOID) {
 }
 
 void printArray(LPVOID) {
-    while (true) {
+    while (true) {  
         for (int i = 0; i < SIZE_ARR; ++i) {
             std::cout << arr[i] << " ";
         }
