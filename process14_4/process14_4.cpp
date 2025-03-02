@@ -1,57 +1,87 @@
+#include <windows.h>
 #include <iostream>
-#include <thread>
-#include <random>
-#include <Windows.h>
-#include <chrono>
+#include <ctime>
 
-const LONG SIZE_ARR = 10;
-LONG arr[SIZE_ARR];     
+const int ARRAY_SIZE = 10;
+long arr[ARRAY_SIZE];
+bool running = true;
+CRITICAL_SECTION cs;
 
-void modifyArray(LPVOID) {
-    srand(time(0));
+using namespace std;
 
-    for (int i = 0; i < SIZE_ARR; ++i) {
-        arr[i] = rand() % 301 - 150;
+void printArray() {
+    for (int i = 0; i < ARRAY_SIZE; i++) {
+        cout << arr[i] << " ";
     }
+    cout << endl;
 }
 
-void replacePositiveNumbers(LPVOID) {
-    while (true) {
-        for (int i = 0; i < SIZE_ARR; ++i) {
-            if (arr[i] > 0) {
-                //замена значений
-                InterlockedExchange(&arr[i], 0);
+DWORD WINAPI threadFillArray(LPVOID) {
+    srand(GetTickCount());
+
+    while (running) {
+        for (int i = 0; i < ARRAY_SIZE; i++) {
+            long newValue = rand() % 301 - 150;
+            InterlockedExchange(&arr[i], newValue);
+        }
+
+        EnterCriticalSection(&cs);
+        cout << "Массив до изменений: ";
+        printArray();
+        LeaveCriticalSection(&cs);
+
+        Sleep(1000);
+    }
+
+    return 0;
+}
+
+DWORD WINAPI threadCriticalSection(LPVOID) {
+    while (running) {
+        for (int i = 0; i < ARRAY_SIZE; i++) {
+            EnterCriticalSection(&cs);
+            long oldValue = arr[i];
+            if (oldValue > 0) {
+                long newValue = 0;
+                InterlockedCompareExchange(&arr[i], newValue, oldValue);
             }
+            LeaveCriticalSection(&cs);
         }
-        std::this_thread::sleep_for(std::chrono::seconds(1));
-    }
-}
+        EnterCriticalSection(&cs);
+        cout << "Массив после изменений: ";
+        printArray();
+        LeaveCriticalSection(&cs);
 
-void printArray(LPVOID) {
-    while (true) {  
-        for (int i = 0; i < SIZE_ARR; ++i) {
-            std::cout << arr[i] << " ";
-        }
-        std::cout << std::endl;
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+        Sleep(1000);
     }
+
+    return 0;
 }
 
 int main() {
-    modifyArray(nullptr);
+    SetConsoleOutputCP(CP_UTF8);
+    SetConsoleCP(CP_UTF8);
+    setlocale(LC_ALL, "ru_RU.UTF-8");
 
-    HANDLE hThread1 = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)modifyArray, NULL, 0, NULL);
-    HANDLE hThread2 = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)replacePositiveNumbers, NULL, 0, NULL);
-    HANDLE hThread3 = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)printArray, NULL, 0, NULL);
+    InitializeCriticalSection(&cs);
 
-    WaitForSingleObject(hThread1, INFINITE);
-    WaitForSingleObject(hThread2, INFINITE);
-    WaitForSingleObject(hThread3, INFINITE);
+    HANDLE hThreads[2];
 
+    hThreads[0] = CreateThread(NULL, 0, threadFillArray, NULL, 0, NULL);
+    hThreads[1] = CreateThread(NULL, 0, threadCriticalSection, NULL, 0, NULL);
 
-    CloseHandle(hThread1);
-    CloseHandle(hThread2);
-    CloseHandle(hThread3);
+    if (!hThreads[0] || !hThreads[1]) {
+        cerr << "Ошибка при создании потоков!" << endl;
+        return 1;
+    }
+
+    WaitForMultipleObjects(2, hThreads, TRUE, INFINITE);
+
+    for (HANDLE hThread : hThreads) {
+        CloseHandle(hThread);
+    }
+
+    DeleteCriticalSection(&cs);
 
     return 0;
 }
